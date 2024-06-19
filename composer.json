@@ -18,5 +18,7 @@
             "email": "contact@oladesoftware.com"
         }
     ],
-    "require": {}
+    "require": {
+		"php": "^8.3"
+	}
 }

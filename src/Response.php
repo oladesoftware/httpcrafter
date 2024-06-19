@@ -32,11 +32,6 @@ class Response
     private string $contentType;
 
     /**
-     * @var array $headers The headers to be sent with the response.
-     */
-    private array $headers = [];
-
-    /**
      * @var mixed $body The body content of the response.
      */
     private mixed $body;
@@ -54,12 +49,6 @@ class Response
         $this->code = $code;
         $this->contentType = $contentType;
         $this->body = $body;
-        $this->headers["Content-Type"] = "$contentType ; charset=utf-8";
-        $this->headers["Content-Length"] = strlen($body);
-        if (!is_null($headers))
-        {
-            $this->headers = array_merge($this->headers, $headers);
-        }
     }
 
     /**
@@ -93,7 +82,6 @@ class Response
     public function setContentType(string $contentType): Response
     {
         $this->contentType = $contentType;
-        $this->headers["Content-Type"] = "$contentType ; charset=utf-8";
         return $this;
     }
 
@@ -105,30 +93,6 @@ class Response
     public function getContentType(): string
     {
         return $this->contentType;
-    }
-
-    /**
-     * Sets a header for the response.
-     *
-     * @param string $name The header name.
-     * @param string $value The header value.
-     * @return Response The current instance for method chaining.
-     */
-    public function setHeaders(string $name, string $value): Response
-    {
-        $this->headers[$name] = $value;
-        return $this;
-    }
-
-    /**
-     * Retrieves the headers. If a name is provided, returns the value for that header.
-     *
-     * @param string|null $name An optional specific header name to retrieve.
-     * @return string|array The headers array or the value for the specified header.
-     */
-    public function getHeaders(?string $name): string|array
-    {
-        return $this->headers[$name] ?? $this->headers;
     }
 
     /**
@@ -161,26 +125,10 @@ class Response
     public function send(): string
     {
         http_response_code($this->code);
-        $this->sendHeader();
+		header("Content-Type: $this->contentType; charset=utf-8");
         return match ($this->contentType) {
             self::JSON => json_encode($this->body),
             self::HTML => $this->body,
         };
-    }
-
-    /**
-     * Sends the headers to the client. This method is called internally by the send method.
-     *
-     * @return void
-     */
-    private function sendHeader(): void
-    {
-        if (!empty($this->headers))
-        {
-            foreach ($this->headers as $name => $value)
-            {
-                header("$name: $value");
-            }
-        }
     }
 }
