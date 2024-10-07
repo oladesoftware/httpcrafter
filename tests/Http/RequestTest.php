@@ -1,8 +1,11 @@
 <?php
 
-use Oladesoftware\Httpcrafter\Request;
+namespace Http;
 
-class RequestTest extends \PHPUnit\Framework\TestCase
+use Oladesoftware\Httpcrafter\Http\Request;
+use PHPUnit\Framework\TestCase;
+
+class RequestTest extends TestCase
 {
     public function testGetServer()
     {

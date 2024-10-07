@@ -1,6 +1,8 @@
 <?php
 
-use Oladesoftware\Httpcrafter\Response;
+namespace Http;
+
+use Oladesoftware\Httpcrafter\Http\Response;
 use PHPUnit\Framework\TestCase;
 
 class ResponseTest extends TestCase
