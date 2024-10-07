@@ -55,7 +55,11 @@ class Response implements ResponseInterface
         $this->contentType = $contentType;
         $this->body = $body;
         $this->headers["Content-Type"] = "$contentType ; charset=utf-8";
-        $this->headers["Content-Length"] = strlen($body);
+        $length = match(gettype($body)){
+            "string" => strlen($body),
+            default => strlen(json_encode($body))
+        };
+        $this->headers["Content-Length"] = strlen($length);
         if (!is_null($headers))
         {
             $this->headers = array_merge($this->headers, $headers);
