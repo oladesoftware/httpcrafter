@@ -2,6 +2,8 @@
 
 namespace Oladesoftware\Httpcrafter\Http;
 
+use InvalidArgumentException;
+
 /**
  * Class Response
  *
@@ -20,6 +22,8 @@ class Response implements ResponseInterface
      * The JSON content type.
      */
     const string JSON = "application/json";
+
+    private const array REDIRECTCODES = [301, 302, 303, 307, 308];
 
     /**
      * @var int $code The HTTP status code for the response.
@@ -166,6 +170,16 @@ class Response implements ResponseInterface
             self::JSON => json_encode($this->body),
             self::HTML => $this->body,
         };
+    }
+
+    public function redirect(string $url, int $code = 302): void
+    {
+        if (!in_array($code, self::REDIRECTCODES)) {
+            throw new InvalidArgumentException('Invalid HTTP status code for redirection.');
+        }
+
+        header("Location: " . $url, true, $code);
+        exit();
     }
 
     private function updateContentLength(): void
