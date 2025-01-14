@@ -78,7 +78,7 @@ class Router{
      * @param string|null $name The optional name for the route to be used in route generation.
      * @return self Returns an instance of the router for method chaining
      */
-    public function addRoute(string $method, string $path, mixed $target, string $name = null): self
+    public function addRoute(string $method, string $path, mixed $target, ?string $name = null): self
     {
         $this->routes[] = [
             "method" => strtoupper($method),
