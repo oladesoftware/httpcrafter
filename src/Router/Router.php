@@ -147,16 +147,38 @@ class Router{
     /**
      * Generate a route path from a given name
      * @param string $name
-     * @return string|null
+     * @param array $params
+     * @param array $queries
+     * @return string
      * @access public
      */
-    public function generatePath(string $name): string|null
+    public function generatePath(string $name, array $params = [], array $queries = []): string
     {
-        if(!array_key_exists($name, $this->namedRoutes))
+        $route = $this->namedRoutes[$name] ?? "";
+
+        if (empty($route))
         {
-            return null;
+            return "";
         }
-        return $this->namedRoutes[$name];
+
+        $pattern = "%\(\?<([^>]+)>[^)]+\)%";
+        if (preg_match_all($pattern, $route, $matches) && !empty($params)) {
+            foreach ($matches[1] as $catch) {
+                if (array_key_exists($catch, $params)) {
+                    $route = preg_replace(
+                        "%\(\?<{$catch}>[^)]+\)%",
+                        $params[$catch],
+                        $route
+                    );
+                }
+            }
+        }
+
+        if (!empty($queries)) {
+            $route = $route . "?" . http_build_query($queries);
+        }
+
+        return $route;
     }
 
     /**
