@@ -125,6 +125,6 @@ class Request
      */
     public function getPost(?string $name = null): string|array
     {
-        return (is_null($name)) ? $this->post : htmlentities($this->post[$name]);
+        return (!is_null($name) && key_exists($name, $this->post)) ? htmlentities($this->post[$name]) : $this->post;
     }
 }
