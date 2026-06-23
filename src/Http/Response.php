@@ -55,11 +55,6 @@ class Response implements ResponseInterface
         $this->contentType = $contentType;
         $this->body = $body;
         $this->headers["Content-Type"] = "$contentType ; charset=utf-8";
-        $length = match(gettype($body)){
-            "string" => strlen($body),
-            default => strlen(json_encode($body))
-        };
-        $this->headers["Content-Length"] = $length;
         if (!is_null($headers))
         {
             $this->headers = array_merge($this->headers, $headers);
@@ -165,11 +160,21 @@ class Response implements ResponseInterface
     public function send(): string
     {
         http_response_code($this->code);
+        $this->updateContentLength();
         $this->sendHeader();
         return match ($this->contentType) {
             self::JSON => json_encode($this->body),
             self::HTML => $this->body,
         };
+    }
+
+    private function updateContentLength(): void
+    {
+        $length = match(gettype($this->body)){
+            "string" => strlen($this->body),
+            default => strlen(json_encode($this->body))
+        };
+        $this->headers["Content-Length"] = $length;
     }
 
     /**

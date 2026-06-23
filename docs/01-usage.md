@@ -12,7 +12,7 @@ The Request class is a part of the Oladesoftware\Httpcrafter namespace and is de
 To initialize the Request class, you can either pass custom arrays for server, query, and post data or let it use the default values from $_SERVER, $_GET, and $_POST superglobals.
 
 ```php
-use Oladesoftware\Httpcrafter\Request;
+use Oladesoftware\Httpcrafter\Http\Request;
 
 // Using default superglobals
 $request = new Request();
@@ -33,7 +33,7 @@ The Response class is part of the Oladesoftware\Httpcrafter namespace and is des
 To initialize the Response class, you can pass the body content, content type, status code, and an optional array of headers. Default values are provided if not specified.
 
 ```php
-use Oladesoftware\Httpcrafter\Response;
+use Oladesoftware\Httpcrafter\Http\Response;
 
 // Using default values
 $response = new Response();
