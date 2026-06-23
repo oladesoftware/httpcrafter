@@ -12,8 +12,8 @@ composer require oladesoftware/httpcrafter
 
 ## Documentation
 
-- [Installation Guide](./docs/00-installation.md)
-- [Usage Guide](./docs/01-usage.md)
+- [Installation Guide](./docs/installation.md)
+- [Usage Guide](./examples/index.php)
 
 ## License
 
