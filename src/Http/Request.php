@@ -9,7 +9,7 @@ namespace Oladesoftware\Httpcrafter\Http;
  *
  * @package Oladesoftware\Httpcrafter
  */
-class Request implements RequestInterface
+class Request
 {
     /**
      * @var array $server The server data.

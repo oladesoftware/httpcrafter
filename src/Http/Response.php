@@ -11,7 +11,7 @@ use InvalidArgumentException;
  *
  * @package Oladesoftware\Httpcrafter
  */
-class Response implements ResponseInterface
+class Response
 {
     /**
      * The HTML content type.

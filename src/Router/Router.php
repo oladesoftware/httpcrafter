@@ -2,58 +2,96 @@
 
 namespace Oladesoftware\Httpcrafter\Router;
 
-/**
- * Class Router
- *
- * A simple router implementation for handling HTTP routes.
- */
-class Router{
-    /**
-     * @var array $routes An array containing the configured routes.
-     *
-     * This array stores the routes configured in the router. Each route is represented as an associative array
-     * with keys:
-     * - 'method' for the HTTP method,
-     * - 'path' for the URI path,
-     * - 'target' for the route's target.
-     *
-     * Example:
-     * [
-     *    ['method' => 'GET', 'path' => '/example', 'target' => ['controller' => 'ExampleController, 'method' => 'index'],
-     *    ['method' => 'POST', 'path' => '/submit', 'target' => function() { ... }],
-     *    ...
-     * ]
-     *
-     * @access private
-     */
-    private array $routes = [];
-    /**
-     * @var array $namedRoutes An array mapping route names to their corresponding paths.
-     *
-     * This array is used to associate names with specific routes, allowing for easy route generation.
-     *
-     * Example:
-     * [
-     *    'home' => '/home',
-     *    'profile' => '/user/profile',
-     *    ...
-     * ]
-     *
-     * @access private
-     */
-    private array $namedRoutes = [];
+use Exception;
+use RuntimeException;
 
-    /**
-     * @var ?Router $_instance An instance of the this Router
-     * @access private
-     */
+class Router{
     private static ?Router $_instance = null;
 
+    private array $pattern_type = [
+        'alpha' => '[a-zA-Z-_]+',
+        'numeric' => '[0-9]+',
+        'alphanum' => '[a-zA-Z0-9-_]+',
+    ] {
+        get {
+            return $this->pattern_type;
+        }
+
+        set (array $pattern_type) {
+            $this->pattern_type = $pattern_type;
+        }
+    }
+
+    private array $resolvers = [] {
+        get {
+            return $this->resolvers;
+        }
+
+        set (array $resolvers) {
+            $this->resolvers = $resolvers;
+        }
+    }
+
+    private array $routes = [] {
+        get {
+            return $this->routes;
+        }
+
+        set (array $routes) {
+            $this->routes = $routes;
+        }
+    }
+
+    private array $groupPrefixStack = [];
+    private array $groupMiddlewareStack = [];
+
     /**
-     * If it is not set, an instance of this router will be create
-     * @return Router
-     * @access public
+     * Prevent instantiation from outside
+     * @access private
      */
+    private function __construct() {
+        $this->addResolver(
+            'callable',
+            function (mixed $target, array $parameters = []): mixed {
+                if (!is_callable($target)) {
+                    return null;
+                }
+                return call_user_func_array($target, $parameters);
+            }
+        );
+
+        $this->addResolver(
+            'string',
+            function (mixed $target, array $parameters = []): mixed {
+                if (!is_string($target)) {
+                    return null;
+                }
+
+                $separators = ['@'];
+
+                foreach ($separators as $separator) {
+                    if (str_contains($target, $separator)) {
+                        [$class, $method] = explode($separator, $target, 2);
+                        return call_user_func_array([new $class(), $method], $parameters);
+                    }
+                }
+
+                return null;
+            }
+        );
+
+        $this->addResolver(
+            'array',
+            function (mixed $target, array $parameters = []): mixed {
+                if (!is_array($target)) {
+                    return null;
+                }
+
+                return call_user_func_array([new $target[0](), $target[1]], $parameters);
+            }
+        );
+    }
+
     public static function getInstance(): Router
     {
         if(is_null(self::$_instance))
@@ -63,216 +101,211 @@ class Router{
         return self::$_instance;
     }
 
-    /**
-     * Prevent instantiation from outside
-     * @access private
-     */
-    private function __construct() {}
-
-    /**
-     * Add a new route to the router configuration.
-     *
-     * @param string $method The HTTP method for the route (e.g., 'GET', 'POST' or 'GET|POST' for multiple methods)
-     * @param string $path The URI path for the route, which may include placeholders.
-     * @param mixed $target The target of the route, such as a controller class or a closure.
-     * @param string|null $name The optional name for the route to be used in route generation.
-     * @return self Returns an instance of the router for method chaining
-     */
-    public function addRoute(string $method, string $path, mixed $target, ?string $name = null): self
+    public function addPatternType(string $name, string $pattern): self
     {
-        $this->routes[] = [
-            "method" => strtoupper($method),
-            "path" => $path,
-            "target" => $target
-        ];
-        if($name){
-            if(!array_key_exists($name, $this->namedRoutes)){
-                $this->namedRoutes[$name] = $path;
-            }
-        }
+        $this->pattern_type = [...$this->pattern_type, $name => $pattern];
         return $this;
     }
 
-    /**
-     * Add a group of many routes with a same basepath to the router configuration.
-     *
-     * @param string $basepath Base path of the group (e.g. '/blog', '/product')
-     * @param array $routes The array of routes that will begin with the basepath
-     * (e.g.
-     * [
-     *   ["method" => "GET", "path" => "/", "target"  => ["controller" => "BlogController", "method" => "index"], "name" => "blog.index"],
-     *   ["GET", "/", ["BlogController", "post"]],
-     *   ["GET|POST", "/articles/new", ["BlogController", "newPost"], "middleware" => "authenticated"]
-     * ]
-     * )
-     * @return Router Returns an instance of the router for method chaining
-     */
-    public function addGroup(string $basepath, array $routes): self
+    public function addResolver(string $name, mixed $callable): self
     {
-        foreach ($routes as $route)
-        {
-            $path = "/" . trim($basepath, "/ ") . "/" . trim($route['path'] ?? $route[1],"/ ");
-            if(array_key_exists("name", $route))
-            {
-                $this->addRoute($route["method"] ?? $route[0], $path, $route["target"] ?? $route[2], $route["name"] ?? $route[3]);
-            }
-            else
-            {
-                $this->addRoute($route["method"] ?? $route[0], $path, $route["target"] ?? $route[2]);
-            }
-            if(array_key_exists("middleware", $route))
-            {
-                $this->middleware($route["middleware"]);
-            }
-        }
+        $this->resolvers = [...$this->resolvers, $name => $callable];
         return $this;
     }
 
-    /**
-     * Assign a middleware to the last added route in the router configuration.
-     *
-     * @param string $name The name of the middleware to be assigned.
-     *
-     * @return self Returns an instance of the router for method chaining.
-     *
-     * Example:
-     * $router->addRoute('GET', '/example', ['controller' => 'ExampleController, 'method' => 'index'])->middleware('auth');
-     */
-    public function middleware(string $name): self
+    public function getRoutes(): array
     {
-        $this->routes[array_key_last($this->routes)]["middleware"] = $name;
+        return $this->routes;
+    }
+
+    public function add(array $methods, string $path, mixed $target, string $name = "", string $middleware = ""): self
+    {
+        $path = $this->applyGroupPrefix($path);
+        $middleware = $middleware !== '' ? $middleware : $this->currentGroupMiddleware();
+
+        if (empty($name)) {
+            try {
+                $name = 'route-' . bin2hex(random_bytes(4));
+            } catch (Exception) {
+                $time = microtime();
+                $name = 'route-' . substr($time, rand(0, strlen($time) -1), 8);
+            }
+        }
+
+        foreach ($methods as $key => $method) {
+            $methods[$key] = strtoupper($method);
+        }
+
+        $this->addRoute(
+            $name,
+            new Route(
+                $methods,
+                $this->compilePath($path),
+                $target,
+                $middleware
+            )
+        );
+
         return $this;
     }
 
-    /**
-     * Generate a route path from a given name
-     * @param string $name
-     * @param array $params
-     * @param array $queries
-     * @return string
-     * @access public
-     */
-    public function generatePath(string $name, array $params = [], array $queries = []): string
+    public function get(string $path, mixed $target, string $name = "", string $middleware = ""): self
     {
-        $route = $this->namedRoutes[$name] ?? "";
+        $this->add(['GET'], $path, $target, $name, $middleware);
+        return $this;
+    }
 
-        if (empty($route))
-        {
-            return "";
+    public function post(string $path, mixed $target, string $name = "", string $middleware = ""): self
+    {
+        $this->add(['POST'], $path, $target, $name, $middleware);
+        return $this;
+    }
+
+    public function form(string $path, mixed $target, string $name = "", string $middleware = ""): self
+    {
+        $this->add(['GET', 'POST'], $path, $target, $name, $middleware);
+        return $this;
+    }
+
+    public function group(string $base, array $callbacks, string $middleware = ''): self
+    {
+        $this->groupPrefixStack[] = trim($base, '/ ');
+        $this->groupMiddlewareStack[] = $middleware;
+
+        try {
+            foreach ($callbacks as $callback) {
+                $callback();
+            }
+        } finally {
+            array_pop($this->groupPrefixStack);
+            array_pop($this->groupMiddlewareStack);
         }
+
+        return $this;
+    }
+
+    public function path(string $name, array $params = [], array $queries = []): string
+    {
+        if (!array_key_exists($name, $this->routes)) {
+            return '';
+        }
+
+        $path  = $this->routes[$name]->path;
 
         $pattern = "%\(\?<([^>]+)>[^)]+\)%";
-        if (preg_match_all($pattern, $route, $matches) && !empty($params)) {
+        if (preg_match_all($pattern, $path, $matches) && !empty($params)) {
             foreach ($matches[1] as $catch) {
                 if (array_key_exists($catch, $params)) {
-                    $route = preg_replace(
+                    $path = preg_replace(
                         "%\(\?<{$catch}>[^)]+\)%",
                         $params[$catch],
-                        $route
+                        $path
                     );
                 }
             }
         }
 
         if (!empty($queries)) {
-            $route = $route . "?" . http_build_query($queries);
+            $path = $path . "?" . http_build_query($queries);
         }
 
-        return $route;
+        return $path;
     }
 
-    /**
-     * Match a requested path and method against configured routes.
-     *
-     * @param string $path The requested URI path.
-     * @param string $method The requested HTTP method (e.g., 'GET', 'POST').
-     *
-     * @return array|false Returns an array containing matched route details or false if no match is found.
-     *
-     * This method iterates over the configured routes and attempts to match the provided URI path and HTTP method.
-     * If a match is found, an array is returned with the following keys:
-     * - 'target': The target of the matched route, such as a controller class or a closure.
-     * - 'params': An associative array of placeholder values extracted from the path.
-     * - 'middleware': The middleware assigned to the matched route (if any).
-     *
-     * If no match is found, the method returns false.
-     */
-    public function match(string $path, string $method): array|false{
-        $params = [];
-        foreach($this->routes as $route){
-
-            if(!preg_match("%^(" . $route["method"] . ")$%", strtoupper($method)))
-            {
-                continue;
-            }
-
-            if(preg_match("%^" . $route["path"] . "$%", $path, $params))
-            {
-                foreach ($params as $key => $item){
-                    if(is_numeric($key)){
-                        unset($params[$key]);
+    public function match(string $method, string $path): array
+    {
+        foreach ($this->routes as $route) {
+            if (in_array(strtoupper($method), $route->methods) && preg_match('#^' . $route->path . '$#', $path, $matches)) {
+                array_shift($matches);
+                $params = [];
+                if (!empty($matches)) {
+                    foreach ($matches as $key => $match) {
+                        if (is_string($key)) {
+                            $params[$key] = $match;
+                        }
                     }
                 }
                 return [
-                    "target" => $route["target"],
-                    "params" => $params,
-                    "middleware" => $route["middleware"] ?? null
+                    'route' => $route,
+                    'params' => $params
                 ];
             }
         }
 
-        return false;
+        return [];
     }
 
-    /**
-     * Execute the specified action based on the matched route details.
-     *
-     * @param array $action An array containing details of the matched route, including the target, params, and middleware.
-     *
-     * @return mixed Returns the result of the executed action.
-     *
-     * This method executes the specified action based on the details of the matched route. The action can be a callable
-     * (e.g., a closure or a function), or an array specifying a controller and method to be invoked. The method handles
-     * different types of targets and their associated parameters.
-     */
-    public function run(array $action): mixed{
-        if (empty($action["params"]))
-        {
-            if (is_callable($action["target"]))
-            {
-                return call_user_func($action["target"]);
+    public function run(mixed $target, array $params = []): mixed
+    {
+        if (is_callable($target)) {
+            return $this->resolvers['callable']($target, $params);
+        } elseif (is_string($target)) {
+            return $this->resolvers['string']($target, $params);
+        } elseif (is_array($target)) {
+            return $this->resolvers['array']($target, $params);
+        } else {
+            throw new RuntimeException('No resolver found for target: ' . gettype($target));
+        }
+    }
+
+    public function handle(string $method, string $path): mixed
+    {
+        $matched = $this->match($method, $path);
+        if (empty($matched)) {
+            return false;
+        }
+        return $this->run($matched['route']->target, $matched['params']);
+    }
+
+    private function addRoute(string $name, Route $route): void
+    {
+        $this->routes = [
+            ...$this->routes,
+            $name => $route
+        ];
+    }
+
+    private function compilePath(string $path): string
+    {
+        if (!preg_match_all('#{([a-z]+:[a-z]+)}#', $path, $matches)) {
+            return $path;
+        }
+        $patterns = $matches[1];
+
+        foreach ($patterns as $pattern) {
+            [$name, $type] = explode(':', $pattern);
+            if (!array_key_exists($type, $this->pattern_type)) {
+                throw new RuntimeException('Unknown pattern type: ' . $type);
             }
-
-            if (is_array($action["target"]))
-            {
-                $contoller = $action["target"]["controller"] ?? $action["target"][0];
-                $method = $action["target"]["method"] ?? $action["target"][1];
-
-                return call_user_func([new $contoller(), $method]);
-            }
+            $path = preg_replace(
+                '({' . $pattern . '})',
+                '(?<' . $name . '>' . $this->pattern_type[$type] .')',
+                $path
+            );
         }
 
-        if (is_callable($action["target"]))
-        {
-            return call_user_func_array($action["target"], $action["params"]);
+        return $path;
+    }
+
+    private function applyGroupPrefix(string $path): string
+    {
+        if (empty($this->groupPrefixStack)) {
+            return $path;
         }
+        return '/'
+            . trim(
+                implode(
+                    '/',
+                    $this->groupPrefixStack
+                ),
+                '/ '
+            )
+            . '/'
+            . trim($path, '/ ');
+    }
 
-        if (is_array($action["target"]))
-        {
-            $contoller = $action["target"]["controller"] ?? $action["target"][0];
-            $method = $action["target"]["method"] ?? $action["target"][1];
-
-            return call_user_func_array([new $contoller(), $method], $action["params"]);
-        }
-
-        if (is_string($action["target"]))
-        {
-            $contoller = explode("@", $action["target"])[0];
-            $method = explode("@", $action["target"])[1];
-
-            return call_user_func_array([new $contoller(), $method], $action["params"]);
-        }
-
-        return false;
+    private function currentGroupMiddleware(): string
+    {
+        return end($this->groupMiddlewareStack) ?: '';
     }
 }
