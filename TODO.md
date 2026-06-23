@@ -6,6 +6,9 @@
 
 - [x] Rewrite Router and rely on class Route
 - [x] Remove ` RequestInterface `, ` ResponseInterface `, ` Authorization `, ` Authenticator `
+- [ ] Write ` RouterTest `
+- [x] Write docs ` route ` and ` router `
+- [ ] Extend ` run() ` to benefit from ` addResolver() `
 
 ### 2. Foundation
 
