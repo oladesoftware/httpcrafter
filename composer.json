@@ -1,0 +1,22 @@
+{
+    "name": "oladesoftware/httpcrafter",
+    "description": "A lightweight http PHP library",
+    "type": "library",
+    "homepage": "https://github.com/oladesoftware/httpcrafter/blob/main/README.md",
+    "require-dev": {
+        "phpunit/phpunit": "^11.1"
+    },
+    "license": "MIT",
+    "autoload": {
+        "psr-4": {
+            "Oladesoftware\\Httpcrafter\\": "src/"
+        }
+    },
+    "authors": [
+        {
+            "name": "Olade Software",
+            "email": "contact@oladesoftware.com"
+        }
+    ],
+    "require": {}
+}
