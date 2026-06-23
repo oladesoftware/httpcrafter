@@ -11,7 +11,7 @@ A lightweight http PHP library designed to simplify the creation, manipulation, 
   - Response class to build and send HTML or JSON 
 
 - Documentation
-  - Basic usage examples
+  - Basic usage with examples
 
 ### Ongoing Maintenance
 

@@ -55,9 +55,9 @@ class Request
      * Retrieves the server data. If a key is provided, returns the value for that key.
      *
      * @param string|null $key An optional specific key to retrieve from the server data.
-     * @return array The server data or the value for the specified key.
+     * @return array|string The server data or the value for the specified key.
      */
-    public function getServer(?string $key = null): array
+    public function getServer(?string $key = null): string|array
     {
         return $this->server[$key] ?? $this->server;
     }
