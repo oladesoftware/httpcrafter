@@ -10,7 +10,7 @@ class RouterFacade
         "s" => "[a-zA-Z]+",
         "a" => "[a-zA-Z0-9]+"
     ];
-    private static string $pattern = "%{([is]):([^}]+)}%";
+    private static string $pattern = "%{([isa]):([^}]+)}%";
 
     private static function processPath(string $path): string
     {
