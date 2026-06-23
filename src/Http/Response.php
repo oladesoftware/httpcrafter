@@ -59,7 +59,7 @@ class Response implements ResponseInterface
             "string" => strlen($body),
             default => strlen(json_encode($body))
         };
-        $this->headers["Content-Length"] = strlen($length);
+        $this->headers["Content-Length"] = $length;
         if (!is_null($headers))
         {
             $this->headers = array_merge($this->headers, $headers);
