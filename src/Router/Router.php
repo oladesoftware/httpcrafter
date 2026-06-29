@@ -7,6 +7,7 @@ use RuntimeException;
 
 class Router{
     private static ?Router $_instance = null;
+    public const string UNRESOLVED = "\0__unresolved__\0";
 
     private array $pattern_type = [
         'alpha' => '[a-zA-Z-_]+',
@@ -54,7 +55,7 @@ class Router{
             'callable',
             function (mixed $target, array $parameters = []): mixed {
                 if (!is_callable($target)) {
-                    return null;
+                    return self::UNRESOLVED;
                 }
                 return call_user_func_array($target, $parameters);
             }
@@ -64,7 +65,7 @@ class Router{
             'string',
             function (mixed $target, array $parameters = []): mixed {
                 if (!is_string($target)) {
-                    return null;
+                    return self::UNRESOLVED;
                 }
 
                 $separators = ['@'];
@@ -84,10 +85,19 @@ class Router{
             'array',
             function (mixed $target, array $parameters = []): mixed {
                 if (!is_array($target)) {
-                    return null;
+                    return self::UNRESOLVED;
                 }
 
-                return call_user_func_array([new $target[0](), $target[1]], $parameters);
+                $class = is_array($target[0]) ? $target[0][0] : $target[0];
+                $constructor_params = is_array($target[0]) ? $target[0][1] : null;
+                $method = $target[1];
+
+                $instance = match(true) {
+                    (is_array($constructor_params)) => new $class(...$constructor_params),
+                    default => new $class()
+                };
+
+                return call_user_func_array([$instance, $method], $parameters);
             }
         );
     }
@@ -103,12 +113,26 @@ class Router{
 
     public function addPatternType(string $name, string $pattern): self
     {
+        if (array_key_exists($name, $this->pattern_type)) {
+            $patterns = $this->pattern_type;
+            $patterns[$name] = $pattern;
+            $this->pattern_type = $patterns;
+            return $this;
+        }
+
         $this->pattern_type = [...$this->pattern_type, $name => $pattern];
         return $this;
     }
 
     public function addResolver(string $name, mixed $callable): self
     {
+        if (array_key_exists($name, $this->resolvers)) {
+            $resolvers = $this->resolvers;
+            $resolvers[$name] = $callable;
+            $this->resolvers = $resolvers;
+            return $this;
+        }
+
         $this->resolvers = [...$this->resolvers, $name => $callable];
         return $this;
     }
@@ -197,7 +221,7 @@ class Router{
             foreach ($matches[1] as $catch) {
                 if (array_key_exists($catch, $params)) {
                     $path = preg_replace(
-                        "%\(\?<{$catch}>[^)]+\)%",
+                        "%\(\?<$catch>[^)]+\)%",
                         $params[$catch],
                         $path
                     );
@@ -237,15 +261,16 @@ class Router{
 
     public function run(mixed $target, array $params = []): mixed
     {
-        if (is_callable($target)) {
-            return $this->resolvers['callable']($target, $params);
-        } elseif (is_string($target)) {
-            return $this->resolvers['string']($target, $params);
-        } elseif (is_array($target)) {
-            return $this->resolvers['array']($target, $params);
-        } else {
-            throw new RuntimeException('No resolver found for target: ' . gettype($target));
+        foreach ($this->resolvers as $resolver) {
+            $result = $resolver($target, $params);
+            if ($result !== self::UNRESOLVED) {
+                return $result;
+            }
         }
+
+        throw new RuntimeException(
+            'No resolver found for target: ' . gettype($target)
+        );
     }
 
     public function handle(string $method, string $path): mixed
@@ -267,7 +292,7 @@ class Router{
 
     private function compilePath(string $path): string
     {
-        if (!preg_match_all('#{([a-z]+:[a-z]+)}#', $path, $matches)) {
+        if (!preg_match_all('#{([a-z_-]+:[a-z]+)}#', $path, $matches)) {
             return $path;
         }
         $patterns = $matches[1];
