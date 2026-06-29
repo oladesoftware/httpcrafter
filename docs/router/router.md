@@ -24,21 +24,21 @@ This returns the single shared instance for the whole process (lazily created on
 
 ## Internal state
 
-| Property               | Type                     | Purpose                                                                                                                                        |
-|------------------------|--------------------------|------------------------------------------------------------------------------------------------------------------------------------------------|
-| `pattern_type`         | `array<string,string>`   | Named regex fragments usable in route placeholders. Defaults: `alpha`, `numeric`, `alphanum`. Extendable via `addPatternType()`.               |
-| `resolvers`            | `array<string,callable>` | Strategies used to execute a route's `target`, keyed by the target's PHP type (`callable`, `string`, `array`). Extendable via `addResolver()`. |
-| `routes`               | `array<string,Route>`    | All registered routes, keyed by route name.                                                                                                    |
-| `groupPrefixStack`     | `array<string>`          | Stack of path prefixes currently active (used by `group()`).                                                                                   |
-| `groupMiddlewareStack` | `array<string>`          | Stack of middleware names currently active (used by `group()`).                                                                                |
+| Property               | Type                     | Purpose                                                                                                                                                                                                        |
+|------------------------|--------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `pattern_type`         | `array<string,string>`   | Named regex fragments usable in route placeholders. Defaults: `alpha`, `numeric`, `alphanum`. Extendable or overwritable via `addPatternType()`.                                                               |
+| `resolvers`            | `array<string,callable>` | Strategies used to execute a route's `target`, keyed by resolver name (`callable`, `string`, `array`). Extendable or overwritable via `addResolver()`. Return `Router::UNRESOLVED` when cannot execute target. |
+| `routes`               | `array<string,Route>`    | All registered routes, keyed by route name.                                                                                                                                                                    |
+| `groupPrefixStack`     | `array<string>`          | Stack of path prefixes currently active (used by `group()`).                                                                                                                                                   |
+| `groupMiddlewareStack` | `array<string>`          | Stack of middleware names currently active (used by `group()`).                                                                                                                                                |
 
 ## Built-in target resolvers
 
-Registered in the constructor, keyed by type:
+Registered in the constructor. Property `resolver` is a named array which is keyed by resolver name:
 
 - **`callable`**: calls the target directly with `call_user_func_array()`.
 - **`string`**: expects the format `"Class@method"`. Splits on `@`, instantiates `Class` with no constructor arguments, and calls `method`.
-- **`array`**: expects `[ClassName, 'method']`. Instantiates `ClassName` with no constructor arguments and calls `method`.
+- **`array`**: expects `[ClassName, 'method']` or `[[ClassName, ['constructor parameter']], 'method']`. Instantiates `ClassName` with constructor arguments if applicable and calls `method`.
 
 ## Public API
 
@@ -46,7 +46,7 @@ Registered in the constructor, keyed by type:
 Registers a new named pattern (e.g. `slug` => `[a-z0-9-]+`) usable in route placeholders as `{param:slug}`.
 
 ### `addResolver(string $name, callable $callable): self`
-Registers a custom resolver for a target type.
+Registers a custom resolver for a target type or overwrite a built-in resolver.
 
 ### `getRoutes(): array`
 Returns all registered `Route` instances, keyed by name.
@@ -103,7 +103,7 @@ Returns `[]` if nothing matches, otherwise:
 ```
 
 ### `run(mixed $target, array $params = []): mixed`
-Dispatches `$target` to the appropriate resolver based on its PHP type (`callable`, `string`, `array`). Throws `RuntimeException` if the type has no matching resolver.
+Loop `$this->resolvers` and check if return differ from `Router::UNRESOLVED` to return the resolver result. Throws `RuntimeException` if the type has no matching resolver.
 
 ### `handle(string $method, string $path): mixed`
 Convenience method combining `match()` and `run()`:
