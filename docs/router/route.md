@@ -1,53 +1,80 @@
 # ` Route ` class
 
-- **Namespace:** ` Oladesoftware\Httpcrafter\Router `
-- **Purpose:** Defines the structure of a route handler in an HTTP routing system, enabling request matching and dispatching.
+---
+
+## Table of contents
+
+- [Overview](#overview)
+- [Usage](#usage)
+- [Properties](#properties)
+
+---
 
 ## Overview
 
-The ` Route ` readonly class represents a route configuration within the [` Router `](./router.md) singleton class. It holds no logic. It contains plain data produced by methods ` Router->add() `, ` Router->get() `, ` Router->post() ` and ` Router->form() `. It encapsulates:
+`Route` class:
 
-- Supported HTTP methods (GET, POST, PUT, DELETE, etc.)
-- The path pattern to match incoming requests
-- The targeted handler
-- Optional middleware for request processing
+- represents a route definition within [`Router` class](./router.md)
+- is a readonly class, making it immutable after initialisation
 
-## Class signature
+---
 
-```php
-readonly class Route
-{
-    public function __construct(
-        public array  $methods,
-        public string $path,
-        public mixed  $target,
-        public string $middleware = ""
-    ){}
-}
-```
-
-## Class properties
-
-| Parameter     | Type            | Required | Default | Description                                                                                                                                                                                                 |
-|---------------|-----------------|----------|---------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `$methods`    | `array<string>` | Yes      | -       | HTTP methods accepted by this route (e.g. ` ['GET'], ['GET', 'POST'] `). Always stored uppercase by ` Router->add() `.                                                                                      |
-| `$path`       | `string`        | Yes      | -       | The compiled path pattern, i.e. a regular expression fragment (placeholders like ` {id:numeric} ` are already turned into named capture groups such as ` (?<id>[0-9]+)) `. Not the raw path the user wrote. |
-| `$target`     | `mixed`         | Yes      | -       | The route handler. Can be a `callable`, a `string` (`"Class@method"`), or an `array` (`[Class::class, 'method']`). Resolved later by `Router::run()`.                                                       |
-| `$middleware` | `string`        | No       | `""`    | Identifier of the middleware to apply to this route. Empty string means no middleware. Not enforced by `Route` itself, enforcement is the caller's responsibility.                                          |
-
-## Usage notes
-
-- **Read-only access**: properties are public but cannot be reassigned (`$route->path = '...'` throws an `Error`).
-- **No behavior**: `Route` does not match, resolve, or execute anything by itself. It is purely descriptive data, to keep responsibilities separated from `Router`.
-- **Path format**: do not assume `path` is the original string passed to `get()`/`post()`/etc. It is already a PCRE-ready pattern (no leading `^`/`#` delimiters — those are added at match time by `Router::match()`).
-
-## Usage example
+## Usage
 
 ```php
-$route = new Route(['GET'], '/users/(?<id>[0-9]+)', 'UserController@show', 'auth');
- 
-$route->methods;    // ['GET']
-$route->path;       // '/users/(?<id>[0-9]+)'
-$route->target;     // 'UserController@show'
-$route->middleware; // 'auth'
+$route = new \Oladesoftware\Httpcrafter\Router\Route(
+    ['GET'],
+    '/users',
+    [UserController::class, 'list'],
+    'auth'
+);
 ```
+
+---
+
+## Properties
+
+### `$methods`
+
+An array of allowed HTTP method.
+
+- **Type:** `array`
+- **Example:** `['GET']`
+
+### `$path`
+
+A string of URI path. 
+
+> Depending of the [`Router` class](./router.md) method `compilePath()` the path may contain a regex.
+
+- **Type:** `string`
+- **Example:** 
+  - `/users`
+  - `/user/(?<id>[0-9a-f-]{36})`
+
+### `$target`
+
+The handler executed when the route matches an incoming request. 
+
+> Depending on the [`Router` class](./router.md) registered `$resolvers`, the target can be an array, a string, a callable, or any other supported registered `$resolvers`.
+
+- **Type:** `mixed`
+- **Example:**
+  - `fn () => 'Hello, world!'`
+  - `function () { return 'Hello, world!'; }`
+  - `UserController::class@list`
+  - `[UserController::class, 'list']`
+
+### `$middleware`
+
+An optional string of the middleware assigned to the route.
+
+- **Type:** `string`
+- **Default:** `''` an empty string
+- **Example:** 
+  - `auth`
+  - `guest`
+  - `token-bearer`
+  - `token-jwt`
+
+---

@@ -6,81 +6,239 @@ use Exception;
 use RuntimeException;
 
 class Router{
-    private static ?Router $_instance = null;
+    public bool $strict_mode = true;
+    protected static ?Router $_instance = null;
     public const string UNRESOLVED = "\0__unresolved__\0";
 
-    private array $pattern_type = [
-        'alpha' => '[a-zA-Z-_]+',
-        'numeric' => '[0-9]+',
-        'alphanum' => '[a-zA-Z0-9-_]+',
-    ] {
+    public array $placeholder_pattern = [] {
         get {
-            return $this->pattern_type;
+            return $this->placeholder_pattern;
         }
 
-        set (array $pattern_type) {
-            $this->pattern_type = $pattern_type;
+        set (array $placeholder_pattern) {
+            if ($this->strict_mode && !empty($placeholder_pattern)) {
+                $required = ['open', 'close', 'separator', 'name', 'type'];
+                $missing = array_diff($required, array_keys($placeholder_pattern));
+
+                if (!empty($missing)) {
+                    throw new RuntimeException(
+                        'Some required keys (' . implode(', ', $missing) . ') are missing.'
+                    );
+                }
+            }
+
+            $this->placeholder_pattern = $placeholder_pattern;
         }
     }
 
-    private array $resolvers = [] {
+    public array $pattern_types = [] {
+        get {
+            return $this->pattern_types;
+        }
+
+        set (array $pattern_types) {
+            if ($this->strict_mode) {
+                foreach ($pattern_types as $name => $pattern) {
+                    if (@preg_match('#' . $pattern . '#', '') === false) {
+                        throw new RuntimeException(
+                            "pattern_type '$name' contains an invalid regex pattern: $pattern"
+                        );
+                    }
+                }
+            }
+
+            $this->pattern_types = $pattern_types;
+        }
+    }
+
+    public array $target_separators = [] {
+        get {
+            return $this->target_separators;
+        }
+
+        set (array $target_separators) {
+            if ($this->strict_mode) {
+                foreach ($target_separators as $separator) {
+                    if (!is_string($separator)) {
+                        throw new RuntimeException(
+                            "target_separator '$separator' must be a string"
+                        );
+                    }
+                }
+            }
+
+            $this->target_separators = $target_separators;
+        }
+    }
+
+    public array $resolvers = [] {
         get {
             return $this->resolvers;
         }
 
         set (array $resolvers) {
+            if ($this->strict_mode) {
+                foreach ($resolvers as $name => $resolver) {
+                    if (!is_callable($resolver)) {
+                        throw new RuntimeException(
+                            "resolver '$name' must be callable"
+                        );
+                    }
+                }
+            }
+
             $this->resolvers = $resolvers;
         }
     }
 
-    private array $routes = [] {
+    public array $routes = [] {
         get {
             return $this->routes;
         }
 
         set (array $routes) {
+            if ($this->strict_mode) {
+                foreach ($routes as $name => $route) {
+                    if (!$route instanceof Route) {
+                        throw new RuntimeException(
+                            "Route named '$name' must be an instance of Route"
+                        );
+                    }
+                }
+            }
+
             $this->routes = $routes;
         }
     }
 
-    private array $groupPrefixStack = [];
-    private array $groupMiddlewareStack = [];
+    public array $middleware_pattern = [] {
+        get {
+            return $this->middleware_pattern;
+        }
 
-    /**
-     * Prevent instantiation from outside
-     * @access private
-     */
-    private function __construct() {
-        $this->addResolver(
-            'callable',
-            function (mixed $target, array $parameters = []): mixed {
-                if (!is_callable($target)) {
-                    return self::UNRESOLVED;
+        set (array $middleware_pattern) {
+            if ($this->strict_mode && !empty($middleware_pattern)) {
+                $valid_stack_order = ['fifo', 'lifo'];
+                $valid_order = ['group_first', 'path_first'];
+
+                if (isset($middleware_pattern['stack_order'])
+                    && !in_array($middleware_pattern['stack_order'], $valid_stack_order, true)) {
+                    throw new RuntimeException(
+                        "middleware_pattern.stack_order must be 'fifo' or 'lifo'"
+                    );
                 }
-                return call_user_func_array($target, $parameters);
+
+                if (isset($middleware_pattern['order'])
+                    && !in_array($middleware_pattern['order'], $valid_order, true)) {
+                    throw new RuntimeException(
+                        "middleware_pattern.order must be 'group_first' or 'path_first'"
+                    );
+                }
             }
-        );
 
-        $this->addResolver(
-            'string',
-            function (mixed $target, array $parameters = []): mixed {
-                if (!is_string($target)) {
-                    return self::UNRESOLVED;
-                }
+            $this->middleware_pattern = $middleware_pattern;
+        }
+    }
 
-                $separators = ['@'];
+    protected array $groupPrefixStack = [];
+    protected array $groupMiddlewareStack = [];
 
-                foreach ($separators as $separator) {
-                    if (str_contains($target, $separator)) {
-                        [$class, $method] = explode($separator, $target, 2);
-                        return call_user_func_array([new $class(), $method], $parameters);
-                    }
-                }
+    public function __construct(bool $withDefaults = true, bool $initSingleton = false) {
+        if ($withDefaults) {
+            $this
+                ->addDefaultPlaceholderPattern()
+                ->addDefaultTargetSeparators()
+                ->addDefaultResolvers()
+                ->addDefaultPatternTypes()
+                ->addDefaultMiddlewarePattern();
+        } else {
+            $this
+                ->clearPlaceholderPattern()
+                ->clearTargetSeparators()
+                ->clearResolvers()
+                ->clearPatternTypes()
+                ->clearMiddlewarePattern();
+        }
 
-                return null;
-            }
-        );
+        if ($initSingleton) {
+            self::$_instance = $this;
+        }
+    }
 
+    public function enableStrictMode(): self
+    {
+        $this->strict_mode = true;
+        return $this;
+    }
+
+    public function disableStrictMode(): self
+    {
+        $this->strict_mode = false;
+        return $this;
+    }
+
+    public function clearPlaceholderPattern(): Router
+    {
+        $this->placeholder_pattern = [
+
+        ];
+        return $this;
+    }
+
+    public function clearResolvers(): Router
+    {
+        $this->resolvers = [];
+        return $this;
+    }
+
+    public function clearPatternTypes(): Router
+    {
+        $this->pattern_types = [];
+        return $this;
+    }
+
+    public function clearTargetSeparators(): Router
+    {
+        $this->target_separators = [];
+        return $this;
+    }
+
+    public function clearMiddlewarePattern(): Router
+    {
+        $this->middleware_pattern = [];
+        return $this;
+    }
+
+    public function addDefaultPlaceholderPattern(): Router
+    {
+        $this->placeholder_pattern = [
+            'open' => '{',
+            'close' => '}',
+            'separator' => ':',
+            'name' => '[a-z_-]+',
+            'type' => '[a-z]+'
+        ];
+        return $this;
+    }
+
+    public function addDefaultTargetSeparators(): Router
+    {
+        $this->target_separators = ['@'];
+        return $this;
+    }
+
+    public function addDefaultPatternTypes(): Router
+    {
+        $this->pattern_types = [
+            'alpha' => '[a-zA-Z-_]+',
+            'numeric' => '[0-9]+',
+            'alphanum' => '[a-zA-Z0-9-_]+',
+        ];
+        return $this;
+    }
+
+    public function addDefaultResolvers(): Router
+    {
         $this->addResolver(
             'array',
             function (mixed $target, array $parameters = []): mixed {
@@ -100,52 +258,170 @@ class Router{
                 return call_user_func_array([$instance, $method], $parameters);
             }
         );
+
+        if (empty($this->target_separators)) {
+            $this->addDefaultTargetSeparators();
+        }
+
+        $this->addResolver(
+            'string',
+            function (mixed $target, array $parameters = []): mixed {
+                if (!is_string($target)) {
+                    return self::UNRESOLVED;
+                }
+
+                foreach ($this->target_separators as $separator) {
+                    if (str_contains($target, $separator)) {
+                        [$class, $method] = explode($separator, $target, 2);
+                        return call_user_func_array([new $class(), $method], $parameters);
+                    }
+                }
+
+                return self::UNRESOLVED;
+            }
+        );
+
+        $this->addResolver(
+            'callable',
+            function (mixed $target, array $parameters = []): mixed {
+                if (!is_callable($target)) {
+                    return self::UNRESOLVED;
+                }
+                return call_user_func_array($target, $parameters);
+            }
+        );
+
+        return $this;
     }
 
-    public static function getInstance(): Router
+    public function addDefaultMiddlewarePattern(): Router
+    {
+        $this->middleware_pattern = [
+            'stack_order' => 'fifo',
+            'order' => 'group_first',
+            'separator' => '+',
+        ];
+        return $this;
+    }
+
+    public static function getInstance(bool $withDefaults = true): Router
     {
         if(is_null(self::$_instance))
         {
-            self::$_instance = new Router();
+            self::$_instance = new Router(
+                $withDefaults,
+                true
+            );
         }
         return self::$_instance;
     }
 
+    public static function removeInstance(): void
+    {
+        self::$_instance = null;
+    }
+
     public function addPatternType(string $name, string $pattern): self
     {
-        if (array_key_exists($name, $this->pattern_type)) {
-            $patterns = $this->pattern_type;
-            $patterns[$name] = $pattern;
-            $this->pattern_type = $patterns;
-            return $this;
+        $existing = $this->pattern_types;
+        $new = [];
+
+        if (array_key_exists($name, $existing)) {
+            $existing[$name] = $pattern;
+        } else {
+            $new[$name] = $pattern;
         }
 
-        $this->pattern_type = [...$this->pattern_type, $name => $pattern];
+        $this->pattern_types = [...$new, ...$existing];
+        return $this;
+    }
+
+    public function removePatternType(string $name): self
+    {
+        $pattern_types = $this->pattern_types;
+
+        if (array_key_exists($name, $pattern_types)) {
+            unset($pattern_types[$name]);
+        }
+        $this->pattern_types = $pattern_types;
+        return $this;
+    }
+
+    public function addTargetSeparator(string $target_separator): self
+    {
+        $target_separators = $this->target_separators;
+        $target_separators = array_unique([...$target_separators ,$target_separator]);
+        $this->target_separators = $target_separators;
+        return $this;
+    }
+
+    public function removeTargetSeparator(string $target_separator): self
+    {
+        $target_separators = $this->target_separators;
+        $target_separators = array_diff($target_separators, [$target_separator]);
+        $this->target_separators = $target_separators;
         return $this;
     }
 
     public function addResolver(string $name, mixed $callable): self
     {
-        if (array_key_exists($name, $this->resolvers)) {
-            $resolvers = $this->resolvers;
-            $resolvers[$name] = $callable;
-            $this->resolvers = $resolvers;
-            return $this;
+        $existing = $this->resolvers;
+        $new = [];
+
+        if (array_key_exists($name, $existing)) {
+            $existing[$name] = $callable;
+        } else {
+            $new[$name] = $callable;
         }
 
-        $this->resolvers = [...$this->resolvers, $name => $callable];
+        $this->resolvers = [...$new, ...$existing];
         return $this;
     }
 
-    public function getRoutes(): array
+    public function removeResolver(string $name): self
     {
-        return $this->routes;
+        if (array_key_exists($name, $this->resolvers)) {
+            $resolvers = $this->resolvers;
+            unset($resolvers[$name]);
+            $this->resolvers = $resolvers;
+        }
+        return $this;
+    }
+
+    public function removeByName(string $name): self
+    {
+        $routes = $this->routes;
+        if (array_key_exists($name, $routes)) {
+            unset($routes[$name]);
+        }
+        $this->routes = $routes;
+        return $this;
+    }
+
+    public function removeByPath(string $path): self
+    {
+        $routes = $this->routes;
+        foreach ($routes as $name => $route) {
+            if ($this->compilePath($path) === $route->path) {
+                unset($routes[$name]);
+            }
+        }
+        $this->routes = $routes;
+        return $this;
+    }
+
+    protected function addRoute(string $name, Route $route): void
+    {
+        $this->routes = [
+            ...$this->routes,
+            $name => $route
+        ];
     }
 
     public function add(array $methods, string $path, mixed $target, string $name = "", string $middleware = ""): self
     {
         $path = $this->applyGroupPrefix($path);
-        $middleware = $middleware !== '' ? $middleware : $this->currentGroupMiddleware();
+        $middleware = $this->combineMiddleware($middleware, $this->currentGroupMiddleware());
 
         if (empty($name)) {
             try {
@@ -214,14 +490,14 @@ class Router{
             return '';
         }
 
-        $path  = $this->routes[$name]->path;
+        $path = $this->routes[$name]->path;
 
-        $pattern = "%\(\?<([^>]+)>[^)]+\)%";
-        if (preg_match_all($pattern, $path, $matches) && !empty($params)) {
+        if (preg_match_all('%\(\?<([^>]+)>[^)]+\)%', $path, $matches) && !empty($params)) {
             foreach ($matches[1] as $catch) {
                 if (array_key_exists($catch, $params)) {
+                    $pattern = '%\(\?<' . preg_quote($catch) . '>[^)]+\)%';
                     $path = preg_replace(
-                        "%\(\?<$catch>[^)]+\)%",
+                        $pattern,
                         $params[$catch],
                         $path
                     );
@@ -229,11 +505,10 @@ class Router{
             }
         }
 
-        if (!empty($queries)) {
-            $path = $path . "?" . http_build_query($queries);
-        }
-
-        return $path;
+        return !empty($queries)
+            ? $path . '?' . http_build_query($queries)
+            : $path
+        ;
     }
 
     public function match(string $method, string $path): array
@@ -282,29 +557,41 @@ class Router{
         return $this->run($matched['route']->target, $matched['params']);
     }
 
-    private function addRoute(string $name, Route $route): void
+    protected function compilePath(string $path): string
     {
-        $this->routes = [
-            ...$this->routes,
-            $name => $route
-        ];
-    }
+        if (empty($this->placeholder_pattern)) {
+            return $path;
+        }
 
-    private function compilePath(string $path): string
-    {
-        if (!preg_match_all('#{([a-z_-]+:[a-z]+)}#', $path, $matches)) {
+        $p = $this->placeholder_pattern;
+        $regex =
+            '#'
+            . preg_quote($p['open'], '#')
+            . '('
+            . $p['name']
+            . $p['separator']
+            . $p['type']
+            . ')'
+            . preg_quote($p['close'], '#')
+            . '#';
+
+        if (!preg_match_all($regex, $path, $matches)) {
             return $path;
         }
         $patterns = $matches[1];
 
         foreach ($patterns as $pattern) {
-            [$name, $type] = explode(':', $pattern);
-            if (!array_key_exists($type, $this->pattern_type)) {
+            [$name, $type] = explode($p['separator'], $pattern, 2);
+            if (!array_key_exists($type, $this->pattern_types)) {
                 throw new RuntimeException('Unknown pattern type: ' . $type);
             }
             $path = preg_replace(
-                '({' . $pattern . '})',
-                '(?<' . $name . '>' . $this->pattern_type[$type] .')',
+                '('
+                . preg_quote($p['open'], '(')
+                . $pattern
+                . preg_quote($p['close'], '(')
+                . ')',
+                '(?<' . $name . '>' . $this->pattern_types[$type] .')',
                 $path
             );
         }
@@ -312,7 +599,7 @@ class Router{
         return $path;
     }
 
-    private function applyGroupPrefix(string $path): string
+    protected function applyGroupPrefix(string $path): string
     {
         if (empty($this->groupPrefixStack)) {
             return $path;
@@ -329,8 +616,40 @@ class Router{
             . trim($path, '/ ');
     }
 
-    private function currentGroupMiddleware(): string
+    protected function currentGroupMiddleware(): string
     {
-        return end($this->groupMiddlewareStack) ?: '';
+        $stack = array_values(array_filter(
+            $this->groupMiddlewareStack,
+            fn(string $m): bool => $m !== ''
+        ));
+
+        if (empty($stack)) {
+            return '';
+        }
+
+        if (($this->middleware_pattern['stack_order'] ?? 'fifo') === 'lifo') {
+            $stack = array_reverse($stack);
+        }
+
+        return implode($this->middleware_pattern['separator'] ?? '+', $stack);
+    }
+
+    protected function combineMiddleware(string $routeMiddleware, string $groupMiddleware): string
+    {
+        if ($routeMiddleware === '') {
+            return $groupMiddleware;
+        }
+        if ($groupMiddleware === '') {
+            return $routeMiddleware;
+        }
+
+        $separator = $this->middleware_pattern['separator'] ?? '+';
+        $order = $this->middleware_pattern['order'] ?? 'group_first';
+
+        $parts = $order === 'path_first'
+            ? [$routeMiddleware, $groupMiddleware]
+            : [$groupMiddleware, $routeMiddleware];
+
+        return implode($separator, $parts);
     }
 }

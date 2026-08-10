@@ -2,6 +2,10 @@
 
 namespace Oladesoftware\Httpcrafter\Router;
 
+/**
+ * Define a route structure
+ * Used by Oladesoftware\Httpcrafter\Router\Router
+ */
 readonly class Route
 {
     public function __construct(
