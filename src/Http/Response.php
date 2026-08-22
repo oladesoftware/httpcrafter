@@ -2,201 +2,135 @@
 
 namespace Oladesoftware\Httpcrafter\Http;
 
-use InvalidArgumentException;
+use RuntimeException;
 
-/**
- * Class Response
- *
- * A class to encapsulate HTTP response data, including status codes, headers, content type, and body content.
- *
- * @package Oladesoftware\Httpcrafter
- */
-class Response
-{
-    /**
-     * The HTML content type.
-     */
-    const string HTML = "text/html";
+class Response {
+    public bool $strict_mode = true;
+    public array $supported_redirection_codes = [300, 301, 302, 303, 304, 305, 306, 307, 308] {
+        get {
+            return $this->supported_redirection_codes;
+        }
 
-    /**
-     * The JSON content type.
-     */
-    const string JSON = "application/json";
+        set (array $supported_redirection_codes) {
+            if ($this->strict_mode) {
+                foreach ($supported_redirection_codes as $code) {
+                    if (!is_int($code) || $code < 300 || $code > 399) {
+                        throw new RuntimeException('Supported redirection code must be an integer between "300" and "309".');
+                    }
+                }
+            }
 
-    private const array REDIRECTCODES = [301, 302, 303, 307, 308];
+            $this->supported_redirection_codes = $supported_redirection_codes;
+        }
+    }
+    public const string HTML = "text/html";
+    public const string JSON = "application/json";
+    public array $supported_types = [Response::HTML, Response::JSON] {
+        get {
+            return $this->supported_types;
+        }
 
-    /**
-     * @var int $code The HTTP status code for the response.
-     */
-    private int $code;
+        set (array $supported_types) {
+            if ($this->strict_mode) {
+                foreach ($supported_types as $type) {
+                    if (!is_string($type)) {
+                        throw new RuntimeException("Value '$type' is not a string");
+                    }
+                }
+            }
 
-    /**
-     * @var string $contentType The content type of the response.
-     */
-    private string $contentType;
-
-    /**
-     * @var array $headers The headers to be sent with the response.
-     */
-    private array $headers = [];
-
-    /**
-     * @var mixed $body The body content of the response.
-     */
-    private mixed $body;
-
-    /**
-     * Response constructor.
-     *
-     * @param mixed $body The body content of the response. Defaults to an empty string.
-     * @param string $contentType The content type of the response. Defaults to Response::HTML.
-     * @param int $code The HTTP status code of the response. Defaults to 200.
-     * @param array|null $headers An optional array of additional headers. Defaults to null.
-     */
-    public function __construct(mixed $body = "", string $contentType = self::HTML, int $code = 200, ?array $headers = null)
-    {
-        $this->code = $code;
-        $this->contentType = $contentType;
-        $this->body = $body;
-        $this->headers["Content-Type"] = "$contentType ; charset=utf-8";
-        if (!is_null($headers))
-        {
-            $this->headers = array_merge($this->headers, $headers);
+            $this->supported_types = $supported_types;
         }
     }
 
-    /**
-     * Sets the HTTP status code for the response.
-     *
-     * @param int $code The HTTP status code.
-     * @return Response The current instance for method chaining.
-     */
-    public function setCode(int $code): Response
-    {
-        $this->code = $code;
-        return $this;
-    }
-
-    /**
-     * Retrieves the current HTTP status code.
-     *
-     * @return int The HTTP status code.
-     */
-    public function getCode(): int
-    {
-        return $this->code;
-    }
-
-    /**
-     * Sets the content type for the response.
-     *
-     * @param string $contentType The content type.
-     * @return Response The current instance for method chaining.
-     */
-    public function setContentType(string $contentType): Response
-    {
-        $this->contentType = $contentType;
-        $this->headers["Content-Type"] = "$contentType ; charset=utf-8";
-        return $this;
-    }
-
-    /**
-     * Retrieves the current content type.
-     *
-     * @return string The content type.
-     */
-    public function getContentType(): string
-    {
-        return $this->contentType;
-    }
-
-    /**
-     * Sets a header for the response.
-     *
-     * @param string $name The header name.
-     * @param string $value The header value.
-     * @return Response The current instance for method chaining.
-     */
-    public function setHeaders(string $name, string $value): Response
-    {
-        $this->headers[$name] = $value;
-        return $this;
-    }
-
-    /**
-     * Retrieves the headers. If a name is provided, returns the value for that header.
-     *
-     * @param string|null $name An optional specific header name to retrieve.
-     * @return string|array The headers array or the value for the specified header.
-     */
-    public function getHeaders(?string $name): string|array
-    {
-        return $this->headers[$name] ?? $this->headers;
-    }
-
-    /**
-     * Sets the body content for the response.
-     *
-     * @param mixed $body The body content.
-     * @return Response The current instance for method chaining.
-     */
-    public function setBody(mixed $body): Response
-    {
-        $this->body = $body;
-        return $this;
-    }
-
-    /**
-     * Retrieves the current body content.
-     *
-     * @return mixed The body content.
-     */
-    public function getBody(): mixed
-    {
-        return $this->body;
-    }
-
-    /**
-     * Sends the response to the client, including headers and body content.
-     *
-     * @return string The body content to be sent.
-     */
-    public function send(): string
-    {
-        http_response_code($this->code);
-        $this->updateContentLength();
-        $this->sendHeader();
-        return match ($this->contentType) {
-            self::JSON => json_encode($this->body),
-            self::HTML => $this->body,
-        };
-    }
-
-    public function redirect(string $url, int $code = 302): void
-    {
-        if (!in_array($code, self::REDIRECTCODES)) {
-            throw new InvalidArgumentException('Invalid HTTP status code for redirection.');
+    public string $content_type = '' {
+        get {
+            return $this->content_type;
         }
 
-        header("Location: " . $url, true, $code);
-        exit();
+        set (string $content_type) {
+            if ($this->strict_mode && !in_array($content_type, $this->supported_types)) {
+                throw new RuntimeException("Content type: '$content_type' is not a supported type");
+            }
+
+            $this->content_type = $content_type;
+        }
     }
 
-    private function updateContentLength(): void
+    public int $code = 200 {
+        get {
+            return $this->code;
+        }
+
+        set (int $code) {
+            $this->code = $code;
+        }
+    }
+
+    public array $headers = [] {
+        get {
+            return $this->headers;
+        }
+
+        set (array $headers) {
+            $this->headers = $headers;
+        }
+    }
+
+    public mixed $body = '' {
+        get {
+            return $this->body;
+        }
+
+        set (mixed $body) {
+            $this->body = $body;
+        }
+    }
+
+    public function __construct(mixed $body = "", string $content_type = self::HTML, int $code = 200, array $headers = [])
     {
-        $length = match(gettype($this->body)){
-            "string" => strlen($this->body),
-            default => strlen(json_encode($this->body))
-        };
-        $this->headers["Content-Length"] = $length;
+        $this->code = $code;
+        $this->content_type = $content_type;
+        $this->body = $body;
+
+        $this->addHeader(
+            'Content-Type',
+            "$content_type ; charset=utf-8"
+        );
+
+        if (!empty($headers)) {
+            foreach ($headers as $name => $value) {
+                $this->addHeader($name, $value);
+            }
+        }
     }
 
-    /**
-     * Sends the headers to the client. This method is called internally by the send method.
-     *
-     * @return void
-     */
-    private function sendHeader(): void
+    public function addSupportedType(string $type): self
+    {
+        $types = [$type, ...$this->supported_types];
+        $this->supported_types = $types;
+        return $this;
+    }
+
+    public function addHeader(string $name, string $value): self
+    {
+        $headers = $this->headers;
+        $headers[$name] = $value;
+        $this->headers = $headers;
+        return $this;
+    }
+
+    public function editHeader(string $name, string $value): self
+    {
+        $headers = $this->headers;
+        if (array_key_exists($name, $headers)) {
+            $headers[$name] = $value;
+            $this->headers = $headers;
+        }
+        return $this;
+    }
+
+    protected function sendHeader(): void
     {
         if (!empty($this->headers))
         {
@@ -205,5 +139,53 @@ class Response
                 header("$name: $value");
             }
         }
+    }
+
+    public function send(): string
+    {
+        http_response_code($this->code);
+        $this->updateContentLength();
+        $this->sendHeader();
+
+        if (!in_array($this->content_type, $this->supported_types)) {
+            throw new RuntimeException(
+                "Content type: '$this->content_type' is not a supported type"
+            );
+        }
+
+        return is_string($this->body)
+            ? $this->body
+            : json_encode($this->body);
+    }
+
+    public function redirect(string $url, int $code = 302): void
+    {
+        if ($this->strict_mode && !in_array($code, $this->supported_redirection_codes)) {
+            throw new RuntimeException('Invalid HTTP status code for redirection.');
+        }
+
+        header("Location: " . $url, true, $code);
+        exit();
+    }
+
+    protected function updateContentLength(): void
+    {
+        $length = match(gettype($this->body)){
+            "string" => strlen($this->body),
+            default => strlen(json_encode($this->body))
+        };
+        $this->editHeader('Content-Length', $length);
+    }
+
+    public function enableStrictMode(): self
+    {
+        $this->strict_mode = true;
+        return $this;
+    }
+
+    public function disableStrictMode(): self
+    {
+        $this->strict_mode = false;
+        return $this;
     }
 }

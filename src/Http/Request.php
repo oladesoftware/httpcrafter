@@ -2,129 +2,207 @@
 
 namespace Oladesoftware\Httpcrafter\Http;
 
-/**
- * Class Request
- *
- * A class to encapsulate HTTP request data, including server variables, query parameters, and POST data.
- *
- * @package Oladesoftware\Httpcrafter
- */
-class Request
-{
-    /**
-     * @var array $server The server data.
-     */
-    private array $server;
-    /**
-     * @var array $query The query data.
-     */
-    private array $query;
+class Request {
+    public static bool $autoStartSession = false;
+    protected static ?self $_instance = null;
 
-    /**
-     * @var array $post The POST data.
-     */
-    private array $post;
+    public array $server = [] {
+        get {
+            return $this->server;
+        }
 
-    /**
-     * Request constructor.
-     *
-     * @param array|null $server An optional array of server data. Defaults to $_SERVER.
-     * @param array|null $query An optional array of query data. Defaults to $_GET.
-     * @param array|null $post An optional array of POST data. Defaults to $_POST.
-     */
-    public function __construct(?array $server = null, ?array $query = null, ?array $post = null)
-    {
-        $this->setServer($server);
-        $this->setQuery($query);
-        $this->setPost($post);
+        set (array $server) {
+            $this->server = $server;
+        }
     }
 
-    /**
-     * Sets the server data.
-     *
-     * @param array|null $server An optional array of server data. Defaults to $_SERVER.
-     * @return Request The current instance for method chaining.
-     */
-    public function setServer(?array $server = null): Request
+    public array $query = [] {
+        get {
+            return $this->query;
+        }
+
+        set (array $query) {
+            $this->query = $query;
+        }
+    }
+    public array $post = [] {
+        get {
+            return $this->post;
+        }
+
+        set (array $post) {
+            $this->post = $post;
+        }
+    }
+    public array $cookies = [] {
+        get {
+            return $this->cookies;
+        }
+
+        set (array $cookies) {
+            $this->cookies = $cookies;
+        }
+    }
+    public array $files = [] {
+        get {
+            return $this->files;
+        }
+
+        set (array $files) {
+            $this->files = $files;
+        }
+    }
+    public array $session = [] {
+        get {
+            return $this->session;
+        }
+
+        set (array $session) {
+           $this->session = $session;
+        }
+    }
+    public array $headers = [] {
+        get {
+            return $this->headers;
+        }
+
+        set (array $headers) {
+            $this->headers = $headers;
+        }
+    }
+
+    public function __construct(bool $initDefault = true, bool $initSingleton = false)
     {
-        $this->server = $server ?? $_SERVER;
+        if ($initDefault) {
+            $this
+                ->addServer()
+                ->addQuery()
+                ->addPost()
+                ->addCookies()
+                ->addFiles()
+                ->addSession()
+                ->addHeaders()
+            ;
+        } else {
+            $this
+                ->clearServer()
+                ->clearQuery()
+                ->clearPost()
+                ->clearCookies()
+                ->clearFiles()
+                ->clearSession()
+                ->clearHeaders()
+            ;
+        }
+
+        if ($initSingleton) {
+            self::$_instance = $this;
+        }
+    }
+
+    public function addServer(): self
+    {
+        $this->server = $_SERVER;
         return $this;
     }
 
-    /**
-     * Retrieves the server data. If a key is provided, returns the value for that key.
-     *
-     * @param string|null $key An optional specific key to retrieve from the server data.
-     * @return array|string The server data or the value for the specified key.
-     */
-    public function getServer(?string $key = null): string|array
+    public function addQuery(): self
     {
-        return $this->server[$key] ?? $this->server;
-    }
-
-    /**
-     * Retrieves the request path from the server data.
-     *
-     * @return string The request path.
-     */
-    public function getPath(): string
-    {
-        return parse_url($this->server["REQUEST_URI"], PHP_URL_PATH);
-    }
-
-    /**
-     * Retrieves the HTTP request method from the server data.
-     *
-     * @return string The HTTP request method.
-     */
-    public function getMethod(): string
-    {
-        return strtoupper($this->server["REQUEST_METHOD"]);
-    }
-
-    /**
-     * Sets the query data.
-     *
-     * @param array|null $query An optional array of query data. Defaults to $_GET.
-     * @return Request The current instance for method chaining.
-     */
-    public function setQuery(?array $query = null): Request
-    {
-        $this->query = $query ?? $_POST;
+        $this->query = $_GET;
         return $this;
     }
 
-    /**
-     * Retrieves the query data. If a key is provided, returns the value for that key.
-     *
-     * @param string|null $name An optional specific key to retrieve from the query data.
-     * @return string|array The query data or the value for the specified key.
-     */
-    public function getQuery(?string $name = null): string|array
+    public function addPost(): self
     {
-        return $this->query[$name] ?? $this->query;
-    }
-
-    /**
-     * Sets the POST data.
-     *
-     * @param array|null $post An optional array of POST data. Defaults to $_POST.
-     * @return Request The current instance for method chaining.
-     */
-    public function setPost(?array $post = null): Request
-    {
-        $this->post = $post ?? $_POST;
+        $this->post = $_POST;
         return $this;
     }
 
-    /**
-     * Retrieves the POST data. If a key is provided, returns the value for that key.
-     *
-     * @param string|null $name An optional specific key to retrieve from the POST data.
-     * @return string|array The POST data or the value for the specified key.
-     */
-    public function getPost(?string $name = null): string|array
+    public function addCookies(): self
     {
-        return (!is_null($name) && key_exists($name, $this->post)) ? htmlentities($this->post[$name]) : $this->post;
+        $this->cookies = $_COOKIE;
+        return $this;
+    }
+
+    public function addFiles(): self
+    {
+        $this->files = $_FILES;
+        return $this;
+    }
+
+    public function addSession(): self
+    {
+        if (self::$autoStartSession && session_status() !== PHP_SESSION_ACTIVE) {
+            session_start();
+        }
+        if (session_status() === PHP_SESSION_ACTIVE) {
+            $this->session = $_SESSION;
+        }
+
+        return $this;
+    }
+
+    public function addHeaders(): self
+    {
+        $this->headers = (function_exists('getallheaders')) ? getallheaders() : [];
+        return $this;
+    }
+
+    public function clearServer(): self
+    {
+        $this->server = [];
+        return $this;
+    }
+
+    public function clearQuery(): self
+    {
+        $this->query = [];
+        return $this;
+    }
+
+    public function clearPost(): self
+    {
+        $this->post = [];
+        return $this;
+    }
+
+    public function clearCookies(): self
+    {
+        $this->cookies = [];
+        return $this;
+    }
+
+    public function clearFiles(): self
+    {
+        $this->files = [];
+        return $this;
+    }
+
+    public function clearSession(): self
+    {
+        if (session_status() === PHP_SESSION_ACTIVE) {
+            $this->session = [];
+        }
+
+        return $this;
+    }
+
+    public function clearHeaders(): self
+    {
+        $this->headers = [];
+        return $this;
+    }
+
+    public static function getInstance(bool $initDefault = true): self
+    {
+        if (is_null(self::$_instance)) {
+            self::$_instance = new self(initDefault: $initDefault, initSingleton: true);
+        }
+        return self::$_instance;
+    }
+
+    public static function removeInstance(): void
+    {
+        self::$_instance = null;
     }
 }

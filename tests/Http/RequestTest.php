@@ -1,55 +1,53 @@
 <?php
 
-namespace Http;
+namespace Tests\Http;
 
 use Oladesoftware\Httpcrafter\Http\Request;
 use PHPUnit\Framework\TestCase;
 
 class RequestTest extends TestCase
 {
-    public function testGetServer()
+    protected function tearDown(): void
     {
-        $request = new Request([]);
-        $this->assertIsArray($request->getServer());
+        Request::removeInstance();
     }
 
-    public function testGetPath()
+    public function testConstructor(): void
     {
-        $request = new Request([
-            "REQUEST_URI" => "/"
-        ]);
-        $this->assertIsString($request->getPath());
+        $this->assertInstanceOf(Request::class, new Request());
     }
 
-    public function testGetMethod()
+    public function testSingleton(): void
     {
-        $request = new Request([
-            "REQUEST_METHOD" => "GET"
-        ]);
-        $this->assertEquals("GET", $request->getMethod());
+        $this->assertInstanceOf(Request::class, Request::getInstance());
     }
 
-    public function testGetQuery()
+    public function testConstructInitSingleton(): void
     {
-        $request = new Request([], []);
-        $this->assertIsArray($request->getQuery());
+        $this->assertSame(new Request(initSingleton: true), Request::getInstance());
     }
 
-    public function testGetQueryWithParams()
+    public function testConstructWithoutDefaults(): void
     {
-        $request = new Request([], ["foo" => "bar"]);
-        $this->assertEquals("bar", $request->getQuery("foo"));
+        $request = new Request(initDefault: false);
+        $this->assertSame([], $request->server);
+        $this->assertSame([], $request->query);
+        $this->assertSame([], $request->post);
+        $this->assertSame([], $request->cookies);
+        $this->assertSame([], $request->files);
+        $this->assertSame([], $request->session);
+        $this->assertSame([], $request->headers);
     }
 
-    public function testPostQuery()
+    public function testSingletonWithoutDefaults(): void
     {
-        $request = new Request([], [], []);
-        $this->assertIsArray($request->getPost());
-    }
-
-    public function testGetPostWithParams()
-    {
-        $request = new Request([], [], ["foo" => "bar"]);
-        $this->assertEquals("bar", $request->getPost("foo"));
+        $request = Request::getInstance(initDefault: false);
+        $this->assertSame([], $request->server);
+        $this->assertSame([], $request->query);
+        $this->assertSame([], $request->post);
+        $this->assertSame([], $request->cookies);
+        $this->assertSame([], $request->files);
+        $this->assertSame([], $request->session);
+        $this->assertSame([], $request->headers);
     }
 }
