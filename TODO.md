@@ -6,9 +6,11 @@
 
 - [x] Rewrite Router and rely on class Route
 - [x] Remove ` RequestInterface `, ` ResponseInterface `, ` Authorization `, ` Authenticator `
-- [ ] Write ` RouterTest `
 - [x] Write docs ` route ` and ` router `
-- [ ] Extend ` run() ` to benefit from ` addResolver() `
+- [x] Extend ` run() ` to benefit from ` addResolver() `
+- [x] Write ` RouterTest `
+- [x] Rewrite Request
+- [x] Rewrite Response
 
 ### 2. Foundation
 
@@ -47,13 +49,14 @@ httpcrafter/
 |     | --- Router/
 |     | --- Container/
 |     | --- Environment/
-| --- src/
+| --- src/ <-- Source code
 |     | --- Http/
 |     | --- Middleware/
 |     | --- Router/
 |     | --- Container/
 |     | --- Environment/
 | --- examples/ <-- example in project alone and together
+|     | --- Router/
 | --- tests/
 |     | --- Http/
 |     | --- Middleware/
