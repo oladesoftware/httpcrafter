@@ -13,7 +13,7 @@
 
 ## Overview
 
-`Response` is an object-oriented bundle to store an HTTP response.
+`Response` is an object-oriented container to store and manipulate an HTTP response.
 
 ---
 
