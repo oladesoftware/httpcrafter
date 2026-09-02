@@ -4,6 +4,27 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+
+
+## [ [0.5.0]() ] - 2026-09-02
+
+Align existing classes to "tools, not rules" philosophy. It means that `Router` can be use with default or without. `Request` is an object-oriented wrapper around PHP's superglobals. `Response` is an object-oriented container to store and manipulate an HTTP response.
+
+### Added
+
+- `Route` class to serve as a route container
+
+### Changed
+
+- rewrite `Router` class to make it more configurable
+- rewrite `Request` class
+- rewrite `Response` class
+
+### Delete
+
+- **BREAKING CHANGE** // delete `RouterFacade` introduced in release [0.4.0](https://github.com/oladesoftware/httpcrafter/releases/tag/v0.4.0)
+- **BREAKING CHANGE** // remove all interfaces because their impose a contract instead of offer tools
+
 ## [ [0.4.0](https://github.com/oladesoftware/httpcrafter/releases/tag/v0.4.0) ] - 2025-07-02
 
 ### Added
